@@ -1,0 +1,177 @@
+\title{Homework 4}
+\author{
+        Jerry Duncan
+}
+\date{\today}
+
+\documentclass[12pt]{article}
+
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{pythonhighlight}
+
+
+\begin{document}
+\maketitle
+
+\section{Problem 1}
+
+\paragraph{Part a} In Table \ref{tab:1a}, I've taken the episode data we're given and converted it into table form so we can see state, actions, and rewards over time. From those we can then update our value function like so, where $\gamma = 1$ because it's episodic:
+
+\begin{gather*}
+  V(S_T) = G_T = R_{T+1} + \gamma G_{T+1} = R_{T+1} + R_{T+2} \dots \\
+  V(8, 19, 0) = -1 \\
+  V(8, 15, 0) = 0 + -1 = -1 \\
+  V(8, 14, 0) = 0 + 0 + -1 = -1 \\
+  V(10, 15, 0) = -1 \\
+  V(8, 20, 0) = 1
+\end{gather*}
+
+\begin{table}[!htb]
+  \centering
+  \caption{Part 1a in tabular form}
+  \label{tab:1a}
+  \begin{tabular}{|c||c|c|c||c|c|c||c|c|c|}
+    \hline
+      &            & 1     &           &             & 2     &           &            & 3     &           \\ \hline
+    T & $S_T$      & $A_T$ & $R_{T+1}$ & $S_T$       & $A_T$ & $R_{T+1}$ & $S_T$      & $A_T$ & $R_{T+1}$ \\ \hline
+    1 & (8, 14, 0) & H     & 0         & (10, 15, 0) & H     & -1        & (8, 20, 0) & S     & 1         \\ \hline
+    2 & (8, 15, 0) & H     & 0         & T           &       &           & T          &       &           \\ \hline
+    3 & (8, 19, 0) & H     & -1        &             &       &           &            &       &           \\ \hline
+    4 & T          &       &           &             &       &           &            &       &           \\ \hline
+  \end{tabular}
+\end{table}
+
+
+\paragraph{Part b} When we use DP methods, we have access to the model's dynamics function, $p(s^\prime, r|s, a)$. When we use MC methods, we often do not have access to it. In order to calculate the next policy, we either need the dynamics function and state value function or just the action-value function. Because we don't have access to the dynamics function when using MC methods, we instead calculate the action-value function so that we can use it to update our policy. This can be seen in the following functions:
+
+\begin{gather*}
+  \pi^\prime (s) = \underset{a}{\text{argmax}} \sum_{s^\prime, r} p(s^\prime, r | s, a)[r + \gamma V_\pi(s^\prime)] \\
+  \pi^\prime (s) = \underset{a}{\text{argmax}} Q_\pi(s, a)
+\end{gather*}
+
+
+\paragraph{Part c} All we need to do is use $Q_\pi$ instead of $V_\pi$.
+
+\begin{gather*}
+  Q(S_T, A_T) = G_T = R_{T+1} + \gamma G_{T+1} = R_{T+1} + R_{T+2} \dots \\
+  Q(8, 19, 0, H) = -1 \\
+  Q(8, 15, 0, H) = 0 + -1 = -1 \\
+  Q(8, 14, 0, H) = 0 + 0 + -1 = -1 \\
+  Q(10, 15, 0, H) = -1 \\
+  Q(8, 20, 0, S) = 1
+\end{gather*}
+
+\section{Problem 2}
+
+\paragraph{Part a} When using an off-policy approach, the estimation policy can be deterministic because our behavior policy can be stochastic and explore all actions and states for us. This allows our off-policy approach to find an optimal policy while using an on-policy $\epsilon$-greedy approach can only find a near-optimal policy, due to it taking a non-greedy action part of the time.
+
+\paragraph{Part b} We often want to find the optimal policy for a given problem. The issue is that in order to find the optimal policy, we need to explore the environment but we'd like our final policy to be greedy. These two things are at odds, so how can we reconcile them? Through off-policy prediction --- that is, we have a behavior policy that generates episodes from the environment and a target policy that we are using to find the optimal policy for the problem. In order to use the behavior policy's episodes to evaluate our target policy, we need to use importance sampling. Importance sampling is a technique for estimating expected values under one distribution (the target policy) given samples from another distribution (the behavior policy). It allows us to evaluate our target policy by weighting the returns from the behavior policy's episodes according to the relative probability of their trajectories occurring under the target policy. This is called the importance-sampling ratio, given by $\rho_{t:T(t)-1} = \Pi_{k=t}^{T-1}\frac{\pi(A_k|S_k)}{b(A_k|S_k)}$. When we scale the returns by these ratios and do a simple average of the results, it is called ordinary importance sampling and is given by the following formula:
+\begin{gather*}
+  V(s) = \frac{\sum_{t \in \tau(s)}\rho_{t:T(t)-1 \cdot G_t}}{|\tau(s)|}
+\end{gather*}
+where $\tau(s)$ is the time steps at which we visited $s$ and $|\tau(s)|$ is the total number of times we visited $s$. We can use this formula to accurately update our state value function while evaluating the target policy.
+
+
+\paragraph{Part c} All the calculations are contained in Table \ref{tab:2c}. This table shows states, rewards, returns, $\pi$, b, $\rho$, $V(S_T)_{unweighted}$, and $V(S_T)_{weighted}$ values for each step in the episode. To specifically answer the question of which entries in the state value function will change, they're given below and include the first and second visit to states to be extra clear about all changes to $V$:
+
+\begin{gather*}
+  \text{unweighted} \\
+  V(2, 0) = \frac{0 \cdot 9}{1} = 0 \text{  first visit}\\
+  V(2, 0) = \frac{0 \cdot 9 + 32 \cdot 10}{2} = 160 \text{  second visit} \\
+  V(2, 1) = \frac{16 \cdot 10}{1} = 160 \\
+  V(1, 1) = \frac{4 \cdot 10}{1} = 40 \\
+  \text{weighted} \\
+  V(2, 0) = \frac{0 \cdot 9}{0} = 0 \text{  first visit}\\
+  V(2, 0) = \frac{0 \cdot 9 + 32 \cdot 10}{0 + 32} = 10 \text{  second visit} \\
+  V(2, 1) = \frac{16 \cdot 10}{16} = 10 \\
+  V(1, 1) = \frac{4 \cdot 10}{4} = 10
+\end{gather*}
+
+\begin{table}[!htb]
+  \centering
+  \caption{Tabularized 2c}
+  \label{tab:2c}
+  \begin{tabular}{|c|c|c|c|c|c|}
+    \hline
+    T                     & 0                                                & 1                                             & 2                               & 3                           & 4 \\ \hline
+    $S_T$                 & (2, 0)                                           & (2, 0)                                        & (2, 1)                          & (1, 1)                      & T \\ \hline
+    $A_T$                 & W                                                & E                                             & N                               & N                           &   \\ \hline
+    $R_{T+1}$             & -1                                               & 0                                             & 0                               & 10                          &   \\ \hline
+    $G_T$                 & 9                                                & 10                                            & 10                              & 10                          &   \\ \hline
+    $\pi(A_T|S_T)$        & 0                                                & 0.5                                           & 1                               & 1                           &   \\ \hline
+    $b(A_T|S_T)$          & 0.25                                             & 0.25                                          & 0.25                            & 0.25                        &   \\ \hline
+    $\rho_{t:T(t)-1}$     & $\frac{0 \cdot 0.5 \cdot 1 \cdot 1}{0.25^4} = 0$ & $\frac{0.5 \cdot 1 \cdot 1}{0.25^3} = 32$     & $\frac{1 \cdot 1}{0.25^2} = 16$ & $\frac{1}{0.25} = 4$        &   \\ \hline
+    $V(S_T)_{unweighted}$ & $\frac{0 \cdot 9}{1} = 0$                        & $\frac{0 \cdot 9 + 32 \cdot 10}{2} = 160$     & $\frac{16 \cdot 10}{1} = 160$   & $\frac{4 \cdot 10}{1} = 40$ &   \\ \hline
+    $V(S_T)_{weighted}$   & $\frac{0 \cdot 9}{0} = 0$                        & $\frac{0 \cdot 9 + 32 \cdot 10}{0 + 32} = 10$ & $\frac{16 \cdot 10}{16} = 10$   & $\frac{4 \cdot 10}{4} = 10$ &   \\ \hline
+  \end{tabular}
+\end{table}
+
+\section{Problem 3}
+
+\paragraph{Part a}
+
+For this problem I've converted the board state into coordinates. Top left is (0, 0) and bottom right is (1, 2). I've converted the MC state, action, and reward chain to tabular form in Table \ref{tab:3a}. I've also calculated $G_T$ going backwards, like in class.
+
+\begin{table}[!htb]
+  \centering
+  \caption{Part 3a in tabular form}
+  \label{tab:3a}
+  \begin{tabular}{|c|c|c|c|c|}
+    \hline
+    T & $S_T$  & $A_T$ & $R_{T+1}$ & $G_T$                   \\ \hline
+    0 & (0, 0) & E     & 0         & $0 + 0.5 \cdot 5 = 2.5$ \\ \hline
+    1 & (0, 1) & S     & 0         & $0 + 0.5 \cdot 10 = 5$  \\ \hline
+    2 & (1, 1) & E     & 0         & $0 + 0.5 \cdot 20 = 10$ \\ \hline
+    3 & (1, 2) & N     & 20        & 20                      \\ \hline
+    4 & T      &       &           &                         \\ \hline
+  \end{tabular}
+\end{table}
+
+Using the $G_T$ values calculated in Table \ref{tab:3a}, we can update our $Q_\pi$ values.
+
+\begin{gather*}
+  Q(S_T, A_T) = Q(S_T, A_T) + \frac{1}{n}[G_T - Q(S_T, A_T)] \\
+  Q(0, 0, E) = 8 + \frac{1}{10}[2.5 - 8] = 7.45 \\
+  Q(0, 1, S) = 4 + \frac{1}{10}[5 - 4] = 4.1 \\
+  Q(1, 1, E) = 10 + \frac{1}{10}[10 - 10] = 10 \\
+  Q(1, 2, N) = 20 + \frac{1}{10}[20 - 20] = 20
+\end{gather*}
+
+\paragraph{Part b} When using ordinary importance sampling, all we need to do is change our $Q$ update function and calculate the appropriate $\rho$ values. In Table \ref{tab:3b} we can see the addition of $\pi$, b, and $\rho$ for each timestep. Using those values, we can update our $Q_\pi$ values like so:
+
+\begin{gather*}
+  Q(S_T, A_T) = Q(S_T, A_T) + \frac{1}{n}[\rho G_T - Q(S_T, A_T)] \\
+  Q(0, 0, E) = 8 + \frac{1}{10}[0 \cdot 2.5 - 8] = 7.2 \\
+  Q(0, 1, S) = 4 + \frac{1}{10}[0 \cdot 5 - 4] = 3.6 \\
+  Q(1, 1, E) = 10 + \frac{1}{10}[2 \cdot 10 - 10] = 11 \\
+  Q(1, 2, N) = 20 + \frac{1}{10}[1 \cdot 20 - 20] = 20
+\end{gather*}
+
+\begin{table}[!htb]
+  \centering
+  \caption{Tabularized 3b}
+  \label{tab:3b}
+  \begin{tabular}{|c|c|c|c|c|c|}
+    \hline
+    T                 & 0                                                     & 1                                             & 2                                   & 3                 & 4 \\ \hline
+    $S_T$             & (0, 0)                                                & (0, 1)                                        & (1, 1)                              & (1, 2)            & T \\ \hline
+    $A_T$             & E                                                     & S                                             & E                                   & N                 &   \\ \hline
+    $R_{T+1}$         & 0                                                     & 0                                             & 0                                   & 20                &   \\ \hline
+    $G_T$             & $0 + 0.5 \cdot 5 = 2.5$                               & $0 + 0.5 \cdot 10 = 5$                        & $0 + 0.5 \cdot 20 = 10$             & 20                &   \\ \hline
+    $\pi(A_T|S_T)$    & 1                                                     & 0                                             & 1                                   & 1                 &   \\ \hline
+    $b(A_T|S_T)$      & 0.5                                                   & 0.5                                           & 0.5                                 & 1                 &   \\ \hline
+    $\rho_{t:T(t)-1}$ & $\frac{1 \cdot 0 \cdot 1 \cdot 1}{0.5^3 \cdot 1} = 0$ & $\frac{0 \cdot 1 \cdot 1}{0.5^2 \cdot 1} = 0$ & $\frac{1 \cdot 1}{0.5 \cdot 1} = 2$ & $\frac{1}{1} = 1$ &   \\ \hline
+  \end{tabular}
+\end{table}
+
+\section{Problem 4}
+
+\paragraph{Part a} Under Initialize, add a line that says: ``$N(s) \gets 0 \text{ for all } s \in S$''. In the looping over each step of the episode, under ``Unless $S_t$ appears in $\dots$'', replace ``Append G to $Returns(S_t)$'' with ``$N(s) \gets N(s) + 1$'' and replace ``$V(S_t) \gets$ average($Returns(S_t)$)'' with ``$V(S_t) \gets V(S_t) + \frac{1}{N(s)}[G - V(S_t)]$''.
+
+\paragraph{Part b} The first thing to note is that in the boxed algorithm for off-policy MC control, $\pi(S_T)$ is deterministic. This means that it is 1 for one action and 0 for all other actions. The boxed algorithm implements a check for this where it exits the inner loop if $A_T \neq \pi(S_T)$ because $\pi(A_T | S_T)$ would be zero and all previous actions before $A_T$ would have a weight of 0 and not matter (since we're going through the episode backwards). If $A_T = \pi(S_T)$ then $\pi(A_T | S_T) = 1$. This is why in the update for W, we see $\frac{1}{b(A_T|S_T)}$. In summary, we short circuit the loop if the action taken by $b$ and by $\pi$ aren't the same because it would cause $W$ to be zero for every action before $A_T$. We use a coefficient of $\frac{1}{b(A_T|S_T)}$ because the only way we reach that line of the algorithm is if $\pi(A_T | S_T) = 1$.
+
+\bibliographystyle{abbrv}
+\bibliography{main}
+
+\end{document}
