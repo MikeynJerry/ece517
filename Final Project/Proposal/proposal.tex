@@ -1,0 +1,39 @@
+\documentclass[titlepage]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx,verbatim,amsmath,amssymb,amsthm}
+\usepackage{subcaption}
+\graphicspath{ {./images/} }
+
+\title{Implementing Deep Q Learning and Double Deep Q learning in training Pac-Man \\ 
+\ \\
+\large {Final Project: Project Proposal}\\
+\ \\
+ECE 517 - Reinforcement Learning \\
+Prof. Dr. Amir Sadovnik
+}
+
+\author{Jerry Duncan, Fabian Fallas, Tabitha Samuel }
+\date{November 2020}
+
+\begin{document}
+
+\maketitle
+\section{Problem definition}
+Using reinforcement learning techniques to teach algorithms to 'play' Atari games has been a popular and constantly evolving research area in the past five years. For this final project, we propose to use Deep Q learning, and double deep Q learning reinforcement learning techniques to train a model to successfully play the Pac-Man game. We will initially train the models on the small grid provided by the \cite{openaigym} , and then compare change in complexity and therefore runtime when they are run on the medium sized grid. 
+
+\section{Problem motivation and background}
+We propose to build upon the work described in \cite{gnanasekaranreinforcement}. In this paper, the group investigates the effectiveness of Deep Q-learning based on the context of the Pac-man game using Q-learning and Approximate Q-learning as baselines. We plan on implementing deep Q learning, and adding an additional model with Double Deep Q learning, and compare performance and trade offs between the two techniques. We will use the code base from \cite{pacmandqn} as a baseline code that we will extend to include Double Deep Q-Learning.
+
+\section{Evaluation of results}
+We would like to evaluate results from three perspectives in this project:
+\begin{itemize}
+\item Evaluate increase in complexity and therefore training time when we  move from the small grid to the medium sized grid.
+\item Compare performance of Deep Q-learning versus Double Deep Q-learning
+\item What else?
+\end{itemize}
+
+\bibliographystyle{IEEEtran}
+\bibliography{proposal}
+\end{document}
+
+
