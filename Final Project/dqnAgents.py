@@ -1,8 +1,15 @@
+"""
+Classes for playing the game
+"""
+
+
 import torch
 import matplotlib.pyplot as plt
 
 from pacman import Directions
 import game
+
+from dqnModels import DQNModel
 
 class Agent(game.Agent):
   def __init__(self):
@@ -82,9 +89,17 @@ class DQNAgent(Agent):
     def __init__(self):
         super().__init__()
         self.i = 0
+        self.model = DQNModel().to(self.device)
 
     def getAction(self, state):
+        # Shape = (Width, Height, Channels)
         state_as_image = self.state_to_image(state)
+
+        # Model expects (Batch Size, Channels, Height, Width)
+        self.model(
+          state_as_image.permute(2, 1, 0).unsqueeze(0).type(torch.float32)
+        )
+
         # Basic set of actions to cause Pacman to eat a capsule
         action = [
           Directions.EAST,
