@@ -3,3 +3,7 @@
 *.fls
 *.log
 *.synctex.gz
+
+.vscode
+.idea
+__pycache__
