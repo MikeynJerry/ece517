@@ -39,13 +39,13 @@ code to run a game.  This file is divided into three sections:
 To play your first game, type 'python pacman.py' from the command line.
 The keys are 'a', 's', 'd', and 'w' to move (or arrow keys).  Have fun!
 """
-from game import GameStateData
-from game import Game
-from game import Directions
-from game import Actions
-from util import nearestPoint
-from util import manhattanDistance
-import util, layout
+from pacman.game import GameStateData
+from pacman.game import Game
+from pacman.game import Directions
+from pacman.game import Actions
+from pacman.util import nearestPoint
+from pacman.util import manhattanDistance
+from pacman import util, layout
 import sys, types, time, random, os
 
 ###################################################
@@ -696,16 +696,16 @@ def readCommand(argv):
 
     # Choose a display format
     if options.quietGraphics:
-        import textDisplay
+        from pacman import textDisplay
 
         args["display"] = textDisplay.NullGraphics()
     elif options.textGraphics:
-        import textDisplay
+        from pacman import textDisplay
 
         textDisplay.SLEEP_TIME = options.frameTime
         args["display"] = textDisplay.PacmanGraphics()
     else:
-        import graphicsDisplay
+        from pacman import graphicsDisplay
 
         args["display"] = graphicsDisplay.PacmanGraphics(
             options.zoom, frameTime=options.frameTime
@@ -741,15 +741,19 @@ def loadAgent(pacman, nographics):
         pythonPathDirs = pythonPathStr.split(";")
     pythonPathDirs.append(".")
 
-    for moduleDir in pythonPathDirs:
+    for moduleDir in pythonPathDirs + ["./pacman/"]:
         if not os.path.isdir(moduleDir):
             continue
         moduleNames = [f for f in os.listdir(moduleDir) if f.endswith("gents.py")]
         for modulename in moduleNames:
             try:
-                module = __import__(modulename[:-3])
-            except ImportError:
+                if moduleDir == "./pacman/":
+                    module = __import__("pacman." + modulename[:-3])
+                else:
+                    module = __import__(modulename[:-3])
+            except ImportError as e:
                 continue
+
             if pacman in dir(module):
                 if nographics and modulename == "keyboardAgents.py":
                     raise Exception(
