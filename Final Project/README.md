@@ -1,9 +1,9 @@
 # Pacman DQN
 
-Run `python pacman.py` to start a game
+Run `python play.py` to start a game
 
-Run `python pacman.py -p DQNAgent` to run a game using our agent
+Run `python play.py -p DQNAgent` to run a game using our agent
 
-`dqnAgents.py` contains our agent code
-
-Create a Conda environment using `conda create --name rl --file requirements.txt`
+`agents.py` contains our agents
+`models.py` contains our models (DQN, DDQN)
+`replay.py` contains our replay selectors
