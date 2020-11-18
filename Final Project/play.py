@@ -48,6 +48,8 @@ from pacman.util import manhattanDistance
 from pacman import util, layout
 import sys, types, time, random, os
 
+from tqdm import trange
+
 ###################################################
 # YOUR INTERFACE TO THE PACMAN WORLD: A GameState #
 ###################################################
@@ -803,23 +805,36 @@ def runGames(
     rules = ClassicGameRules(timeout)
     games = []
 
-    for i in range(numGames):
-        beQuiet = i < numTraining
-        if beQuiet:
-            # Suppress output and graphics
-            import textDisplay
+    if numTraining > 0:
+        from pacman import textDisplay
 
-            gameDisplay = textDisplay.NullGraphics()
-            rules.quiet = True
-        else:
-            gameDisplay = display
-            rules.quiet = False
+        gameDisplay = textDisplay.NullGraphics()
+        rules.quiet = True
+        for i in trange(numTraining, desc="Training Games"):
+            game = rules.newGame(
+                layout, pacman, ghosts, gameDisplay, True, catchExceptions
+            )
+            game.run()
+
+            if record:
+                import time, cPickle
+
+                fname = ("recorded-game-%d" % (i + 1)) + "-".join(
+                    [str(t) for t in time.localtime()[1:6]]
+                )
+                f = file(fname, "w")
+                components = {"layout": layout, "actions": game.moveHistory}
+                cPickle.dump(components, f)
+                f.close()
+
+    gameDisplay = display
+    rules.quiet = False
+    for i in range(numGames - numTraining):
         game = rules.newGame(
-            layout, pacman, ghosts, gameDisplay, beQuiet, catchExceptions
+            layout, pacman, ghosts, gameDisplay, False, catchExceptions
         )
         game.run()
-        if not beQuiet:
-            games.append(game)
+        games.append(game)
 
         if record:
             import time, cPickle
