@@ -5,10 +5,8 @@ Classes for playing the game
 import json
 import math
 import random
-from enum import Enum
 
 import torch
-import matplotlib.pyplot as plt
 
 from pacman.game import Directions
 from pacman import game
@@ -19,7 +17,7 @@ from replay import BasicReplay
 GAMMA = 0.999
 EPS_START = 1
 EPS_END = 0.05
-EPS_DECAY = 250
+EPS_DECAY = 500
 TARGET_UPDATE = 100
 
 
@@ -197,7 +195,7 @@ class DQNAgent(Agent):
         # Target network update period
         self.target_update_period = 100
         # Iteration to start training from
-        self.train_start = 100
+        self.train_start = 1000
         self.built = False
 
         # Episode = the number of the pacman game we're on
@@ -250,8 +248,7 @@ class DQNAgent(Agent):
         # Q(S_t, A_t), we request Q(S_t) from our policy model and then
         #  index those values using the actions we actually took during the episode
         state_action_values = self.policy(states.type(torch.float32))
-        state_action_values = state_action_values.gather(1, actions.unsqueeze(0))
-
+        state_action_values = state_action_values.gather(1, actions.unsqueeze(1))
         # Old code relating to preventing predictions on next states that were terminal
         #
         # non_terminal_mask = torch.tensor(
@@ -298,7 +295,7 @@ class DQNAgent(Agent):
         expected_state_action_values = rewards + GAMMA * target_state_action_values
 
         loss = torch.nn.functional.smooth_l1_loss(
-            state_action_values, expected_state_action_values.unsqueeze(0)
+            state_action_values, expected_state_action_values.unsqueeze(1)
         )
 
         # Saved for stats
