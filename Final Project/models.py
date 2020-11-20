@@ -6,7 +6,19 @@ import torch
 from torch import nn
 
 
-class DQNModel(nn.Module):
+model_registry = {}
+
+
+def register(key):
+    def decorator(cls):
+        model_registry[key] = cls
+        return cls
+
+    return decorator
+
+
+@register("stanford")
+class StanfordDQNModel(nn.Module):
     def __init__(self, width, height, nb_actions=4):
         super().__init__()
 
@@ -28,6 +40,31 @@ class DQNModel(nn.Module):
             nn.Linear(flat_features, 256),
             nn.ReLU(),
             nn.Linear(256, nb_actions),
+        )
+
+    def forward(self, inp):
+        out = self.conv(inp)
+        out = self.head(out)
+        return out
+
+
+@register("small")
+class SmallGridDQN(nn.Module):
+    def __init__(self, width, height, nb_actions=4):
+        super().__init__()
+
+        # Conv2d = (in channels, out channels, kernel width)
+        self.conv = nn.Sequential(
+            nn.Conv2d(6, 32, 3), nn.ReLU(), nn.Conv2d(32, 64, 2), nn.ReLU()
+        )
+
+        flat_features = self.conv(torch.zeros(1, 6, height, width)).view(1, -1).size(1)
+
+        self.head = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(flat_features, 512),
+            nn.ReLU(),
+            nn.Linear(512, nb_actions),
         )
 
     def forward(self, inp):

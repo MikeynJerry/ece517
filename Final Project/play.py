@@ -518,11 +518,11 @@ def parseAgentArgs(str):
     return opts
 
 
-def readCommand(argv):
+def readCommand():
     """
     Processes the command used to run pacman from the command line.
     """
-    from optparse import OptionParser
+    from argparse import ArgumentParser
 
     usageStr = """
     USAGE:      python pacman.py <options>
@@ -532,34 +532,34 @@ def readCommand(argv):
                 OR  python pacman.py -l smallClassic -z 2
                     - starts an interactive game on a smaller board, zoomed in
     """
-    parser = OptionParser(usageStr)
+    parser = ArgumentParser(description=usageStr)
 
-    parser.add_option(
+    parser.add_argument(
         "-n",
         "--numGames",
         dest="numGames",
-        type="int",
-        help=default("the number of GAMES to play"),
+        type=int,
+        help="the number of GAMES to play",
         metavar="GAMES",
         default=1,
     )
-    parser.add_option(
+    parser.add_argument(
         "-l",
         "--layout",
         dest="layout",
-        help=default("the LAYOUT_FILE from which to load the map layout"),
+        help="the LAYOUT_FILE from which to load the map layout",
         metavar="LAYOUT_FILE",
         default="mediumClassic",
     )
-    parser.add_option(
+    parser.add_argument(
         "-p",
         "--pacman",
         dest="pacman",
-        help=default("the agent TYPE in the pacmanAgents module to use"),
+        help="the agent TYPE in the pacmanAgents module to use",
         metavar="TYPE",
         default="KeyboardAgent",
     )
-    parser.add_option(
+    parser.add_argument(
         "-t",
         "--textGraphics",
         action="store_true",
@@ -567,7 +567,7 @@ def readCommand(argv):
         help="Display output as text only",
         default=False,
     )
-    parser.add_option(
+    parser.add_argument(
         "-q",
         "--quietTextGraphics",
         action="store_true",
@@ -575,31 +575,31 @@ def readCommand(argv):
         help="Generate minimal output and no graphics",
         default=False,
     )
-    parser.add_option(
+    parser.add_argument(
         "-g",
         "--ghosts",
         dest="ghost",
-        help=default("the ghost agent TYPE in the ghostAgents module to use"),
+        help="the ghost agent TYPE in the ghostAgents module to use",
         metavar="TYPE",
         default="RandomGhost",
     )
-    parser.add_option(
+    parser.add_argument(
         "-k",
         "--numghosts",
-        type="int",
+        type=int,
         dest="numGhosts",
-        help=default("The maximum number of ghosts to use"),
+        help="The maximum number of ghosts to use",
         default=4,
     )
-    parser.add_option(
+    parser.add_argument(
         "-z",
         "--zoom",
-        type="float",
+        type=float,
         dest="zoom",
-        help=default("Zoom the size of the graphics window"),
+        help="Zoom the size of the graphics window",
         default=1.0,
     )
-    parser.add_option(
+    parser.add_argument(
         "-f",
         "--fixRandomSeed",
         action="store_true",
@@ -607,7 +607,7 @@ def readCommand(argv):
         help="Fixes the random seed to always play the same game",
         default=False,
     )
-    parser.add_option(
+    parser.add_argument(
         "-r",
         "--recordActions",
         action="store_true",
@@ -615,34 +615,28 @@ def readCommand(argv):
         help="Writes game histories to a file (named by the time they were played)",
         default=False,
     )
-    parser.add_option(
+    parser.add_argument(
         "--replay",
         dest="gameToReplay",
         help="A recorded game file (pickle) to replay",
         default=None,
     )
-    parser.add_option(
-        "-a",
-        "--agentArgs",
-        dest="agentArgs",
-        help='Comma separated values sent to agent. e.g. "opt1=val1,opt2,opt3=val3"',
-    )
-    parser.add_option(
+    parser.add_argument(
         "-x",
         "--numTraining",
         dest="numTraining",
-        type="int",
-        help=default("How many episodes are training (suppresses output)"),
+        type=int,
+        help="How many episodes are training (suppresses output)",
         default=0,
     )
-    parser.add_option(
+    parser.add_argument(
         "--frameTime",
         dest="frameTime",
-        type="float",
-        help=default("Time to delay between frames; <0 means keyboard"),
+        type=float,
+        help="Time to delay between frames; <0 means keyboard",
         default=0.1,
     )
-    parser.add_option(
+    parser.add_argument(
         "-c",
         "--catchExceptions",
         action="store_true",
@@ -650,19 +644,15 @@ def readCommand(argv):
         help="Turns on exception handling and timeouts during games",
         default=False,
     )
-    parser.add_option(
+    parser.add_argument(
         "--timeout",
         dest="timeout",
-        type="int",
-        help=default(
-            "Maximum length of time an agent can spend computing in a single game"
-        ),
+        type=int,
+        help="Maximum length of time an agent can spend computing in a single game",
         default=30,
     )
 
-    options, otherjunk = parser.parse_args(argv)
-    if len(otherjunk) != 0:
-        raise Exception("Command line input not understood: " + str(otherjunk))
+    options, _ = parser.parse_known_args()
     args = dict()
 
     # Fix the random seed
@@ -679,18 +669,14 @@ def readCommand(argv):
         options.textGraphics or options.quietGraphics
     )
     pacmanType = loadAgent(options.pacman, noKeyboard)
-    agentOpts = parseAgentArgs(options.agentArgs)
-    if options.numTraining > 0:
-        args["numTraining"] = options.numTraining
-        if "numTraining" not in agentOpts:
-            agentOpts["numTraining"] = options.numTraining
-    pacman = pacmanType(**agentOpts)  # Instantiate Pacman with agentArgs
+    pacmanType.add_args(parser)
+    options = parser.parse_args()
+    pacman = pacmanType(
+        settings=options.__dict__, **options.__dict__
+    )  # Instantiate Pacman with agentArgs
     args["pacman"] = pacman
 
-    # Don't display training games
-    if "numTrain" in agentOpts:
-        options.numQuiet = int(agentOpts["numTrain"])
-        options.numIgnore = int(agentOpts["numTrain"])
+    args["numTraining"] = options.numTraining
 
     # Choose a ghost agent
     ghostType = loadAgent(options.ghost, noKeyboard)
@@ -870,7 +856,7 @@ if __name__ == "__main__":
 
     > python pacman.py --help
     """
-    args = readCommand(sys.argv[1:])  # Get game components based on input
+    args = readCommand()  # Get game components based on input
     runGames(**args)
 
     # import cProfile

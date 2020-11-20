@@ -5,21 +5,17 @@ Classes for playing the game
 import json
 import math
 import random
+from pathlib import Path
 
 import torch
 
 from pacman.game import Directions
 from pacman import game
 
-from models import DQNModel
+from models import model_registry
 from replay import BasicReplay
 
-GAMMA = 0.999
-EPS_START = 1
-EPS_END = 0.05
-EPS_DECAY = 500
-TARGET_UPDATE = 100
-
+from default_config import *
 
 directions_to_values = {
     Directions.NORTH: 0,
@@ -34,7 +30,7 @@ values_to_directions = dict([(val, key) for key, val in directions_to_values.ite
 class Agent(game.Agent):
     def __init__(self):
         super().__init__()
-        self.device = "cuda"
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
         # White
         self.capsule_color = torch.tensor(
@@ -153,16 +149,16 @@ class Agent(game.Agent):
 
         # Set the capsule locations
         for capsule in capsules:
-            image[0, capsule] = True
+            image[5, capsule] = True
 
         # Food locations
-        image[1] = food
+        image[4] = food
 
         # Wall locations
-        image[2] = walls
+        image[0] = walls
 
         # Pacman's location
-        image[3][pacman] = True
+        image[1][pacman] = True
 
         # Ghost positions
         for ghost, scared in zip(ghosts, ghost_states):
@@ -177,15 +173,319 @@ class Agent(game.Agent):
 
             # Set ghost color based on if the ghost hasn't been eaten since Pacman ate a 'capsule'
             if not scared:
-                image[4][ghost] = True
+                image[2][ghost] = True
             else:
-                image[5][ghost] = True
+                image[3][ghost] = True
 
         # Models expect (Batch Size, Channels, Height, Width)
-        return image.permute(0, 2, 1).unsqueeze(0)
+        return image.permute(0, 2, 1).unsqueeze(0).type(torch.float32)
 
 
 class DQNAgent(Agent):
+    def __init__(
+        self,
+        *,
+        # Eps Args
+        gamma,
+        eps_start,
+        eps_end,
+        eps_decay,
+        eps_schedule,
+        # Train Args
+        train_start,
+        target_update,
+        numTraining,
+        # Stat Args
+        log_dir,
+        logging_period,
+        # Model Args
+        model_type,
+        model_dir,
+        model_period,
+        batch_size,
+        settings={},
+        **kwargs,
+    ):
+        super().__init__()
+
+        self.replay = BasicReplay()
+
+        # Used for stats
+        self.eps = []
+        self.all_losses = []
+        self.avg_losses = []
+        self.episode_losses = []
+
+        # Epsilon Arguments
+        self.gamma = gamma
+        self.eps_start = eps_start
+        self.eps_end = eps_end
+        self.eps_decay = eps_decay
+        self.eps_schedule = eps_schedule
+
+        # Training Arguments
+        self.train_start = train_start
+        self.target_update_period = target_update
+        self.training_epsiodes = numTraining
+
+        # Stats and Logging Arguments
+        self.logging_period = logging_period
+        if log_dir is not None:
+            self.log_path = Path(DEFAULT_LOG_ROOT) / log_dir
+            self.log_path.mkdir(parents=True, exist_ok=True)
+            with open(self.log_path / "config.json", "w+") as f:
+                json.dump(settings, f)
+            self.log_file = open(self.log_path / "log.txt", "w+")
+        else:
+            self.log_path = None
+
+        # Model Arguments
+        self.model_type = model_type
+        self.model_dir = Path(DEFAULT_MODEL_ROOT) / model_dir
+        self.model_dir.mkdir(parents=True, exist_ok=True)
+        self.model_period = model_period
+        self.batch_size = batch_size
+
+        # Episode = the number of the pacman game we're on
+        self.episode = 0
+        # Iteration = the iteration number of the current episode
+        self.iteration = 0
+        # Total Iterations = the number of iterations we've went through over all episodes
+        self.total_iterations = 0
+        # Helps us build our models on first time receiving state
+        self.built = False
+
+    @staticmethod
+    def add_args(parser):
+
+        # Epsilon Arguments
+        parser.add_argument("--gamma", default=DEFAULT_GAMMA, type=float)
+        parser.add_argument("--eps-start", default=DEFAULT_EPS_START, type=float)
+        parser.add_argument("--eps-end", default=DEFAULT_EPS_END, type=float)
+        parser.add_argument("--eps-decay", default=DEFAULT_EPS_DECAY, type=float)
+        parser.add_argument(
+            "--eps-schedule", default="linear", choices=["linear", "exponential"]
+        )
+
+        # Training Arguments
+        parser.add_argument("--train-start", default=DEFAULT_TRAIN_START, type=int)
+        parser.add_argument("--target-update", default=DEFAULT_TARGET_UPDATE, type=int)
+
+        # Stats and Logging Arguments
+        parser.add_argument("--log-dir")
+        parser.add_argument(
+            "--log-frequency",
+            default=DEFAULT_LOGGING_PERIOD,
+            dest="logging_period",
+            type=int,
+        )
+
+        # Model Arguments
+        parser.add_argument(
+            "--model-type", default="small", choices=model_registry.keys()
+        )
+        parser.add_argument("--model-dir", required=True)
+        parser.add_argument(
+            "--model-save-rate",
+            default=DEFAULT_MODEL_PERIOD,
+            dest="model_period",
+            type=int,
+        )
+        parser.add_argument("--batch-size", default=DEFAULT_BATCH_SIZE, type=int)
+
+    def build(self, state):
+        # Create duplicate policy and target models
+        self.policy = model_registry[self.model_type](
+            width=state.data.layout.width, height=state.data.layout.height
+        ).to(self.device)
+        self.target = model_registry[self.model_type](
+            width=state.data.layout.width, height=state.data.layout.height
+        ).to(self.device)
+
+        # Suggested optimization method
+        # TODO: Maybe use a scheduled learning rate?
+        self.optimizer = torch.optim.RMSprop(
+            self.policy.parameters(), lr=0.00025, alpha=0.95, eps=0.01
+        )
+
+        self.built = True
+
+    def registerInitialState(self, state):
+        if not self.built:
+            self.build(state)
+
+        self.episode += 1
+        self.iteration = 0
+
+        self.last_state = self.state_to_tensor(state)
+        self.last_score = 0
+
+        self.episode_losses = []
+
+    def train_step(self):
+
+        if self.episode < self.train_start:
+            self.all_losses.append(0)
+            return
+
+        states, actions, rewards, next_states, terminal = self.replay.sample(
+            self.batch_size
+        )
+
+        # Q(S_t, A_t), we request Q(S_t) from our policy model and then
+        #  index those values using the actions we actually took during the episode
+        state_action_values = self.policy(states)
+        state_action_values = state_action_values.gather(1, actions.unsqueeze(1))
+
+        # We predict on all next states (S_t+1) for convenience
+        target_state_action_values = self.target(next_states)
+        # But if the next state is terminal, we don't want to use predicted Q values for it --- they should default to 0
+        # We want to set all action values that have terminal next states to 0
+        target_state_action_values[terminal] = 0
+        # We now take the max of each sample
+        target_state_action_values = target_state_action_values.detach().max(1)[0]
+
+        # r + gamma * max_a Q(S_{t+1}, a)
+        expected_state_action_values = rewards + self.gamma * target_state_action_values
+
+        loss = torch.nn.functional.smooth_l1_loss(
+            state_action_values.squeeze(), expected_state_action_values
+        )
+
+        # Saved for stats
+        self.all_losses.append(loss.item())
+        self.episode_losses.append(loss.item())
+
+        # Backprop step
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+    def getAction(self, state):
+
+        self.iteration += 1
+        self.total_iterations += 1
+
+        # Shape = (1, Channels, Height, Width)
+        state_as_tensor = self.state_to_tensor(state)
+
+        # Either pick a random action (as long as we're still training)
+        if random.random() < self.epsilon and self.episode <= self.training_epsiodes:
+            (action,) = random.sample(
+                [action for value, action in values_to_directions.items()], 1
+            )
+        # Or ask our model for one
+        else:
+            state_action_values = self.policy(state_as_tensor)
+            action = values_to_directions[
+                torch.argmax(state_action_values, dim=1).item()
+            ]
+
+        # Start saving data for replaying later
+        if self.iteration > 1:
+            self.replay.push(
+                state=self.last_state,
+                action=self.last_action,
+                reward=state.getScore() - self.last_score,
+                next_state=state_as_tensor,
+                terminal=False,
+            )
+
+        self.last_action = directions_to_values[action]
+        self.last_state = state_as_tensor
+        self.last_score = state.getScore()
+
+        # Delay training by some number of steps so our replay cache has data
+        self.train_step()
+
+        # If we chose an illegal action, it's because those actions have a higher reward
+        #  than moving legally, thus we'd rather just stop
+        # Example: Pacman is in a corner and not moving is more advantageous than moving
+        if action not in state.getLegalActions():
+            action = Directions.STOP
+
+        return action
+
+    def save_stats(self):
+        if self.log_path is None:
+            return
+        stats = {}
+        stats["loss_vs_iteration"] = self.all_losses
+        stats["avg_loss"] = self.avg_losses
+        stats["eps"] = self.eps
+        with open(self.log_path / "stats.json", "w+") as f:
+            json.dump(stats, f)
+
+    @property
+    def epsilon(self):
+        if self.eps_schedule == "linear":
+            return max(self.eps_end, self.eps_start - self.episode / self.eps_decay)
+
+        if self.eps_schedule == "exponential":
+            return self.eps_end + (self.eps_start - self.eps_end) * math.exp(
+                -self.episode / self.eps_decay
+            )
+
+    # Called when the game is over with the final state
+    def final(self, state):
+        # This is solely done for convenience to create tensors in the replay
+        state_as_tensor = self.state_to_tensor(state)
+
+        # Save final state transitions
+        self.replay.push(
+            state=self.last_state,
+            action=self.last_action,
+            reward=100 if state.isWin() else state.getScore() - self.last_score,
+            next_state=state_as_tensor,
+            terminal=True,
+        )
+
+        self.train_step()
+
+        # Kept for stats
+        self.eps.append(self.epsilon)
+        self.avg_losses.append(
+            sum(self.episode_losses) / (len(self.episode_losses) + 1e-10)
+        )
+
+        if self.episode % self.logging_period == 0 and self.log_path is not None:
+            # Update the stats file every episode
+            self.save_stats()
+
+            self.log_file.write(
+                " | ".join(
+                    [
+                        f"Episode {self.episode:>5}",
+                        f"Won: {str(state.isWin()):>5}",
+                        f"Reward: {state.getScore():>6}",
+                        f"Epsilon: {self.eps[-1]:.4f}",
+                    ]
+                )
+                + "\n"
+            )
+
+        # Update target network parameters periodically
+        if self.episode % self.target_update_period == 0:
+            self.target.load_state_dict(self.policy.state_dict())
+
+        if self.episode % self.model_period == 0:
+            torch.save(
+                self.policy.state_dict(),
+                self.model_dir / DEFAULT_POLICY_FILE_NAME.format(self.episode),
+            )
+            torch.save(
+                self.target.state_dict(),
+                self.model_dir / DEFAULT_TARGET_FILE_NAME.format(self.episode),
+            )
+
+
+"""
+Don't touch this
+This is here to reattempt the Stanford model for faster training
+"""
+
+
+class StanfordDQNAgent:
     def __init__(self, numTraining=0, **kwargs):
         super().__init__()
         # Passed on the command line using -x

@@ -9,17 +9,17 @@ import torch
 
 
 TimeStep = namedtuple(
-    "TimeStep", ["state", "action", "reward", "next_state", "next_actions"]
+    "TimeStep", ["state", "action", "reward", "next_state", "terminal"]
 )
 
 
 class Replay:
     def __init__(self):
-        self.device = "cuda"
-        self.steps = deque(maxlen=100_000)
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.steps = deque(maxlen=50_000)
 
-    def push(self, state, action, reward, next_state, next_actions):
-        step = TimeStep(state, action, reward, next_state, next_actions)
+    def push(self, state, action, reward, next_state, terminal):
+        step = TimeStep(state, action, reward, next_state, terminal)
         self.steps.append(step)
 
 
@@ -37,14 +37,8 @@ class BasicReplay(Replay):
         rewards = torch.tensor([step.reward for step in steps], device=self.device)
         # Next States: (1, Channels, Height, Width) -> (Batch Size, Channels, Height, Width)
         next_states = torch.cat([step.next_state for step in steps])
-        # Next Actions is a (Batch Size, # Actions) boolean mask that is True for legal actions at T + 1
-        # Example: next_actions[i][j] is True if action j in sample i is legal
-        next_actions = torch.full(
-            (batch_size, 4), False, dtype=torch.bool, device=self.device
-        )
-        for i, step in enumerate(steps):
-            if step.next_actions is not None:
-                next_actions[i][step.next_actions] = True
+        # Terminal: () -> (Batch Size)
+        terminal = torch.tensor([step.terminal for step in steps], device=self.device)
 
-        return states, actions, rewards, next_states, next_actions
+        return states, actions, rewards, next_states, terminal
 
