@@ -241,8 +241,11 @@ class DQNAgent(Agent):
 
         # Model Arguments
         self.model_type = model_type
-        self.model_dir = Path(DEFAULT_MODEL_ROOT) / model_dir
-        self.model_dir.mkdir(parents=True, exist_ok=True)
+        if model_dir is not None:
+            self.model_dir = Path(DEFAULT_MODEL_ROOT) / model_dir
+            self.model_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            self.model_dir = None
         self.model_period = model_period
         self.batch_size = batch_size
 
@@ -264,7 +267,7 @@ class DQNAgent(Agent):
         parser.add_argument("--eps-end", default=DEFAULT_EPS_END, type=float)
         parser.add_argument("--eps-decay", default=DEFAULT_EPS_DECAY, type=float)
         parser.add_argument(
-            "--eps-schedule", default="linear", choices=["linear", "exponential"]
+            "--eps-schedule", default=DEFAULT_EPS_SCHEDULE, choices=["linear", "exponential"]
         )
 
         # Training Arguments
@@ -282,9 +285,9 @@ class DQNAgent(Agent):
 
         # Model Arguments
         parser.add_argument(
-            "--model-type", default="small", choices=model_registry.keys()
+            "--model-type", default=DEFAULT_MODEL_TYPE, choices=model_registry.keys()
         )
-        parser.add_argument("--model-dir", required=True)
+        parser.add_argument("--model-dir")
         parser.add_argument(
             "--model-save-rate",
             default=DEFAULT_MODEL_PERIOD,
@@ -468,7 +471,7 @@ class DQNAgent(Agent):
         if self.episode % self.target_update_period == 0:
             self.target.load_state_dict(self.policy.state_dict())
 
-        if self.episode % self.model_period == 0:
+        if self.episode % self.model_period == 0 and self.model_dir is not None:
             torch.save(
                 self.policy.state_dict(),
                 self.model_dir / DEFAULT_POLICY_FILE_NAME.format(self.episode),

@@ -19,3 +19,64 @@
   - `-f` uses a fixed seed and should be set so we can recreate results
   - `-q` causes output of the `n - x` non-training episodes to be text only (`e.g. Pacman died! Score: ___`)
     - Remove this option if you want to see our model's actions played out on the actual board
+
+## Agent Command Line Arguments
+
+All of the defaults can be changed in `default_config.py`
+
+### Epsilon Arguments
+
+- `--gamma <gamma>`
+  - Discount factor when calculating the return of the next state
+  - Default: `DEFAULT_GAMMA = 0.95`
+- `--eps-start <eps_start>`
+  - The `eps` value to start training at
+  - Default: `DEFAULT_EPS_START = 1`
+- `--eps-end <eps_end>`
+  - The `eps` value to end training at
+  - Default: `DEFAULT_EPS_END = 0.05`
+- `--eps-decay <num_episodes>`
+  - The rate at which `eps` goes down
+  - Default: `DEFAULT_EPS_DECAY = 7500`
+- `--eps-schedule <schedule>`
+  - Whether to use a linear or exponential `eps` decay
+  - Default: `DEFAULT_EPS_SCHEDULE = linear`
+
+### Training Arguments
+
+- `--train-start <episode_num>`
+  - The episode to start training on
+  - Default: `DEFAULT_TRAIN_START = 300`
+- `--target-update <num_episodes>`
+  - Copy the policy weights to the target network every `<num_episodes>`
+  - Default: `DEFAULT_TARGET_UPDATE = 100`
+
+### Stats and Logging Arguments
+
+- `--log-dir <log_dir>`
+  - The directory to save stats files to
+  - If you omit this, then no stats are saved
+  - The directory root is `DEFAULT_LOG_ROOT = experiments`
+  - The place stats will be saved is then `<DEFAULT_LOG_ROOT>/<log_dir>`
+- `--log-frequency <num_episodes>`
+  - Save stats every `<num_episodes>`
+  - Default: `DEFAULT_LOGGING_PERIOD = 10`
+
+### Model Arguments
+
+- `--model-type <model_type>`
+  - Pick which type of model to use
+  - Our small grid model is called `small`
+  - New models can be added using the `@register(model_type)` decorator in `models.py`
+- `--model-dir <model_dir>`
+  - The directory to save model files to
+  - If you omit this, then no model files are saved
+  - The directory root is `DEFAULT_MODEL_ROOT = saved_models`
+  - The place models will be saved is then `<DEFAULT_MODEL_ROOT>/<model_dir>`
+  - The filenames for models are `DEFAULT_POLICY_FILE_NAME = policy_episode_{:05d}.th` and `DEFAULT_TARGET_FILE_NAME = target_episode_{:05d}.th`
+- `--model-save-rate <num_episodes>`
+  - Save policy and target models every `<num_episodes>`
+  - Default: `DEFAULT_MODEL_PERIOD = 500`
+- `--batch-size <batch_size>`
+  - The size of learning batches to sample from the replay
+  - Default: `DEFAULT_BATCH_SIZE = 32`
