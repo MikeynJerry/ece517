@@ -1,6 +1,6 @@
 """
 Classes for playing the game
-"""
+""" 
 
 import json
 import math
@@ -275,7 +275,10 @@ class DQNAgent(Agent):
         parser.add_argument("--target-update", default=DEFAULT_TARGET_UPDATE, type=int)
 
         # Stats and Logging Arguments
-        parser.add_argument("--log-dir")
+        parser.add_argument(
+            "--log-dir",
+            default="./",
+        )
         parser.add_argument(
             "--log-frequency",
             default=DEFAULT_LOGGING_PERIOD,

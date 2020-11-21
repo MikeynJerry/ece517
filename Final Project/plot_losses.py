@@ -1,10 +1,10 @@
 import json
 import matplotlib.pyplot as plt
 
-with open("stats.json", "r") as f:
+with open("experiments/fabian/stats.json", "r") as f:
     stats = json.load(f)
 
-losses = stats["losses"]
+losses = stats["avg_loss"]
 plt.plot(range(len(losses)), losses)
 plt.title("Loss")
 plt.show()
