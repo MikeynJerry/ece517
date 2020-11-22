@@ -80,3 +80,6 @@ All of the defaults can be changed in `default_config.py`
 - `--batch-size <batch_size>`
   - The size of learning batches to sample from the replay
   - Default: `DEFAULT_BATCH_SIZE = 32`
+- `--replay-type <replay_type>`
+  - The type of replay memory to use.
+  - Default: `DEFAULT_REPLAY = "basic"`
