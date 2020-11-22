@@ -83,3 +83,9 @@ All of the defaults can be changed in `default_config.py`
 - `--replay-type <replay_type>`
   - The type of replay memory to use.
   - Default: `DEFAULT_REPLAY = "basic"`
+- `----replay-alpha <--replay_alpha>`
+  - The value of alpha in the priority replay formula.
+  - Default: `DEFAULT_ALPHA_EXPERIENCE_REPLAY = 0.9`
+- `----replay-beta <--replay_beta>`
+  - The value of beta in the priority replay formula.
+  - Default: `DEFAULT_BETA_EXPERIENCE_REPLAY = 0.4`
