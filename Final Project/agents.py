@@ -8,12 +8,13 @@ import random
 from pathlib import Path
 
 import torch
+import torch.autograd as autograd
 
 from pacman.game import Directions
 from pacman import game
 
 from models import model_registry
-from replay import BasicReplay
+from replay import BasicReplay, PrioritizedExperienceReplay
 
 from default_config import *
 
@@ -203,12 +204,19 @@ class DQNAgent(Agent):
         model_dir,
         model_period,
         batch_size,
-        settings={},
+        replay_type,
+        settings={}, 
         **kwargs,
     ):
         super().__init__()
 
-        self.replay = BasicReplay()
+        #set new instance of replay
+        self.replay_type = replay_type
+        if replay_type == "basic":
+            self.replay = BasicReplay()
+        else:
+            self.replay = PrioritizedExperienceReplay(DEFAULT_ALPHA_EXPERIENCE_REPLAY,
+                                                  DEFAULT_BETA_EXPERIENCE_REPLAY)
 
         # Used for stats
         self.eps = []
@@ -298,6 +306,9 @@ class DQNAgent(Agent):
             type=int,
         )
         parser.add_argument("--batch-size", default=DEFAULT_BATCH_SIZE, type=int)
+        
+        #replay parameter
+        parser.add_argument("--replay-type", default=DEFAULT_REPLAY, type=str)
 
     def build(self, state):
         # Create duplicate policy and target models
@@ -334,9 +345,16 @@ class DQNAgent(Agent):
             self.all_losses.append(0)
             return
 
-        states, actions, rewards, next_states, terminal = self.replay.sample(
-            self.batch_size
-        )
+        if self.replay_type == "basic":
+            #normal replay
+            states, actions, rewards, next_states, terminal = self.replay.sample(
+                self.batch_size
+            )
+        else:
+            #prioritized experience replay
+            states, actions, rewards, next_states, terminal, indices, weights = self.replay.sample(
+                self.batch_size
+            )
 
         # Q(S_t, A_t), we request Q(S_t) from our policy model and then
         #  index those values using the actions we actually took during the episode
@@ -354,10 +372,22 @@ class DQNAgent(Agent):
         # r + gamma * max_a Q(S_{t+1}, a)
         expected_state_action_values = rewards + self.gamma * target_state_action_values
 
-        loss = torch.nn.functional.smooth_l1_loss(
-            state_action_values.squeeze(), expected_state_action_values
-        )
 
+        if self.replay_type == "basic":
+            loss = torch.nn.functional.mse_loss(
+                state_action_values.squeeze(), expected_state_action_values
+            )
+        else:
+            loss = (state_action_values.squeeze() - expected_state_action_values.detach()).pow(2)
+                    
+            #update priorities from the prioritized experience replay
+            weights = torch.tensor([weight for weight in weights], device=self.device)
+
+            loss *= weights
+            prios = loss + 1e-5
+            self.replay.update_priorities_replay(indices, prios.data.cpu().numpy())
+            loss = loss.mean()
+        
         # Saved for stats
         self.all_losses.append(loss.item())
         self.episode_losses.append(loss.item())
