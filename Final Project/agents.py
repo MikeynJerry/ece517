@@ -205,6 +205,8 @@ class DQNAgent(Agent):
         model_period,
         batch_size,
         replay_type,
+        replay_alpha,
+        replay_beta,
         settings={}, 
         **kwargs,
     ):
@@ -215,8 +217,8 @@ class DQNAgent(Agent):
         if replay_type == "basic":
             self.replay = BasicReplay()
         else:
-            self.replay = PrioritizedExperienceReplay(DEFAULT_ALPHA_EXPERIENCE_REPLAY,
-                                                  DEFAULT_BETA_EXPERIENCE_REPLAY)
+            self.replay = PrioritizedExperienceReplay(replay_alpha,
+                                                      replay_beta)
 
         # Used for stats
         self.eps = []
@@ -307,8 +309,10 @@ class DQNAgent(Agent):
         )
         parser.add_argument("--batch-size", default=DEFAULT_BATCH_SIZE, type=int)
         
-        #replay parameter
+        #replay parameters
         parser.add_argument("--replay-type", default=DEFAULT_REPLAY, type=str)
+        parser.add_argument("--replay-alpha", default=DEFAULT_ALPHA_EXPERIENCE_REPLAY, type=float)
+        parser.add_argument("--replay-beta", default=DEFAULT_BETA_EXPERIENCE_REPLAY, type=float)
 
     def build(self, state):
         # Create duplicate policy and target models
