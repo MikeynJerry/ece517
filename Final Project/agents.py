@@ -378,17 +378,24 @@ class DQNAgent(Agent):
 
 
         if self.replay_type == "basic":
-            loss = torch.nn.functional.mse_loss(
+            loss = torch.nn.functional.smooth_l1_loss(
                 state_action_values.squeeze(), expected_state_action_values
             )
         else:
-            loss = (state_action_values.squeeze() - expected_state_action_values.detach()).pow(2)
+            loss = torch.nn.functional.smooth_l1_loss(
+                state_action_values.squeeze(), 
+                expected_state_action_values,
+                reduction='none'
+            )
                     
             #update priorities from the prioritized experience replay
             weights = torch.tensor([weight for weight in weights], device=self.device)
-
+            
+            #weight the loss
             loss *= weights
             prios = loss + 1e-5
+            
+            #update priorities
             self.replay.update_priorities_replay(indices, prios.data.cpu().numpy())
             loss = loss.mean()
         
