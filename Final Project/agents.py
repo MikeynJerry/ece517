@@ -7,6 +7,7 @@ import math
 import random
 from pathlib import Path
 
+import numpy as np
 import torch
 import torch.autograd as autograd
 
@@ -61,17 +62,30 @@ class DQNAgent(game.Agent):
         replay_beta,
         # Loss / Optimizer Args,
         loss_type,
+        # Testing Args
+        is_training=True,
+        model_paths=[],
+        nb_testing_episodes=100,
         settings={},
         **kwargs,
     ):
         super().__init__()
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        # Used for stats
+        # Used for training stats
         self.eps = []
         self.all_losses = []
         self.avg_losses = []
         self.episode_losses = []
+
+        # Used for testing stats
+        self.training_stats = {
+            episode_number: {"wins": [], "scores": []}
+            for episode_number in [
+                model_period * model_number
+                for model_number in range(1, len(model_paths) + 1)
+            ]
+        }
 
         # Epsilon Arguments
         self.gamma = gamma
@@ -112,6 +126,12 @@ class DQNAgent(game.Agent):
 
         # Loss and Optimizer Arguments
         self.loss_fn = loss_functions[loss_type]
+
+        # Testing Arguments
+        self.is_training = is_training
+        self.model_paths = model_paths
+        self.nb_testing_episodes = nb_testing_episodes
+        self.model_number = 0
 
         # Episode = the number of the pacman game we're on
         self.episode = 0
@@ -174,7 +194,7 @@ class DQNAgent(game.Agent):
             "--loss-type", default=DEFAULT_LOSS_TYPE, choices=loss_functions.keys()
         )
 
-    def build(self):
+    def build(self, state):
         raise NotImplementedError()
 
     def getAction(self, state):
@@ -185,7 +205,11 @@ class DQNAgent(game.Agent):
         state_as_tensor = self.get_state_tensor(state)
 
         # Either pick a random action (as long as we're still training)
-        if random.random() < self.epsilon and self.episode <= self.training_epsiodes:
+        if (
+            random.random() < self.epsilon
+            and self.episode <= self.training_epsiodes
+            and self.is_training
+        ):
             (action,) = random.sample(
                 [action for value, action in values_to_directions.items()], 1
             )
@@ -197,7 +221,7 @@ class DQNAgent(game.Agent):
             ]
 
         # Start saving data for replaying later
-        if self.iteration > 1:
+        if self.iteration > 1 and self.is_training:
             self.replay.push(
                 state=self.last_state,
                 action=self.last_action,
@@ -236,6 +260,17 @@ class DQNAgent(game.Agent):
 
     # Called when the game is over with the final state
     def final(self, state):
+
+        if not self.is_training:
+            self.training_stats[self.model_number * self.model_period]["wins"].append(
+                state.isWin()
+            )
+            self.training_stats[self.model_number * self.model_period]["scores"].append(
+                state.getScore()
+            )
+            self.save_testing_stats()
+            return
+
         # This is solely done for convenience to create tensors in the replay
         state_as_tensor = self.get_state_tensor(state)
 
@@ -256,9 +291,13 @@ class DQNAgent(game.Agent):
             sum(self.episode_losses) / (len(self.episode_losses) + 1e-10)
         )
 
-        if self.episode % self.logging_period == 0 and self.log_path is not None:
+        if (
+            self.episode % self.logging_period == 0
+            and self.log_path is not None
+            and self.episode < self.training_epsiodes
+        ):
             # Update the stats file every episode
-            self.save_stats()
+            self.save_training_stats()
 
             self.log_file.write(
                 " | ".join(
@@ -290,6 +329,13 @@ class DQNAgent(game.Agent):
         if not self.built:
             self.build(state)
 
+        if not self.is_training and self.episode % self.nb_testing_episodes == 0:
+            random.seed("cs188")
+            np.random.seed(seed=0)
+            torch.manual_seed(0)
+            self.policy.load_state_dict(torch.load(self.model_paths[self.model_number]))
+            self.model_number += 1
+
         self.episode += 1
         self.iteration = 0
 
@@ -298,17 +344,26 @@ class DQNAgent(game.Agent):
 
         self.episode_losses = []
 
-    def save_stats(self):
+    def save_training_stats(self):
         if self.log_path is None:
             return
         stats = {}
         stats["loss_vs_iteration"] = self.all_losses
         stats["avg_loss"] = self.avg_losses
         stats["eps"] = self.eps
-        with open(self.log_path / "stats.json", "w+") as f:
+        with open(self.log_path / "training_stats.json", "w+") as f:
             json.dump(stats, f)
 
+    def save_testing_stats(self):
+        if self.log_path is None:
+            return
+        with open(self.log_path / "testing_stats.json", "w+") as f:
+            json.dump(self.training_stats, f)
+
     def train_step(self):
+        if not self.is_training:
+            return
+
         if self.episode < self.train_start:
             self.all_losses.append(0)
             return

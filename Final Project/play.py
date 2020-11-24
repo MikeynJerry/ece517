@@ -48,7 +48,12 @@ from pacman.util import manhattanDistance
 from pacman import util, layout
 import sys, types, time, random, os
 
+import glob
+import json
 from tqdm import trange
+
+import torch
+import numpy as np
 
 ###################################################
 # YOUR INTERFACE TO THE PACMAN WORLD: A GameState #
@@ -651,13 +656,45 @@ def readCommand():
         help="Maximum length of time an agent can spend computing in a single game",
         default=30,
     )
+    parser.add_argument("--from-experiment")
+    parser.add_argument("--nb-testing-episodes", default=100, type=int)
 
     options, _ = parser.parse_known_args()
     args = dict()
 
+    # This is a fragile hack, don't touch it
+    config = {}
+    if options.from_experiment is not None:
+        path = f"experiments/{options.from_experiment}/config.json"
+        if not os.path.exists(path):
+            raise ValueError(
+                "`--from-experiment` must be a valid directory and contain a valid `config.json`"
+            )
+        with open(path, "r") as f:
+            config = json.load(f)
+
+        config["is_training"] = False
+
+        if "model_dir" not in config:
+            raise ValueError(
+                "When using `--from-experiment` to test models, the model directory must exist"
+            )
+
+        config["model_paths"] = glob.glob(
+            f"saved_models/{config['model_dir']}/policy*.th"
+        )
+        config["numTraining"] = options.nb_testing_episodes * len(config["model_paths"])
+        config["numGames"] = options.nb_testing_episodes * len(config["model_paths"])
+        config["nb_testing_episodes"] = options.nb_testing_episodes
+        args["numTesting"] = options.nb_testing_episodes
+
+    options.__dict__.update(config)
+
     # Fix the random seed
-    if options.fixRandomSeed:
+    if options.fixRandomSeed or options.from_experiment is not None:
         random.seed("cs188")
+        np.random.seed(seed=0)
+        torch.manual_seed(0)
 
     # Choose a layout
     args["layout"] = layout.getLayout(options.layout)
@@ -671,6 +708,7 @@ def readCommand():
     pacmanType = loadAgent(options.pacman, noKeyboard)
     pacmanType.add_args(parser)
     options = parser.parse_args()
+    options.__dict__.update(config)
     pacman = pacmanType(
         settings=options.__dict__, **options.__dict__
     )  # Instantiate Pacman with agentArgs
@@ -781,6 +819,7 @@ def runGames(
     numGames,
     record,
     numTraining=0,
+    numTesting=0,
     catchExceptions=False,
     timeout=30,
 ):
@@ -796,7 +835,10 @@ def runGames(
 
         gameDisplay = textDisplay.NullGraphics()
         rules.quiet = True
-        for i in trange(numTraining, desc="Training Games"):
+        pbar = trange(
+            numTraining, desc="Training Games" if numTesting == 0 else "Testing Games"
+        )
+        for i in pbar:
             game = rules.newGame(
                 layout, pacman, ghosts, gameDisplay, True, catchExceptions
             )

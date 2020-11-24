@@ -9,7 +9,9 @@ def load_stats(path):
 
 
 def plot(experiments, datakeys, as_subplots):
-    paths = [f"experiments/{experiment}/stats.json" for experiment in experiments]
+    paths = [
+        f"experiments/{experiment}/training_stats.json" for experiment in experiments
+    ]
     stats = [load_stats(path) for path in paths]
 
     if as_subplots:
