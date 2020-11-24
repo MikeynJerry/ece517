@@ -66,8 +66,8 @@ All of the defaults can be changed in `default_config.py`
 
 - `--model-type <model_type>`
   - Pick which type of model to use
-  - Our small grid model is called `small`
   - New models can be added using the `@register(model_type)` decorator in `models.py`
+  - Default: `DEFAULT_MODEL_TYPE = small`
 - `--model-dir <model_dir>`
   - The directory to save model files to
   - If you omit this, then no model files are saved
@@ -80,8 +80,12 @@ All of the defaults can be changed in `default_config.py`
 - `--batch-size <batch_size>`
   - The size of learning batches to sample from the replay
   - Default: `DEFAULT_BATCH_SIZE = 32`
+
+### Replay Arguments
+
 - `--replay-type <replay_type>`
-  - The type of replay memory to use.
+  - The type of replay memory to use
+  - New replays can be added using the `@register(replay_type)` decorator in `replays.py`
   - Default: `DEFAULT_REPLAY = "basic"`
 - `--replay-alpha <replay_alpha>`
   - The value of alpha in the priority replay formula.
@@ -89,3 +93,9 @@ All of the defaults can be changed in `default_config.py`
 - `--replay-beta <replay_beta>`
   - The value of beta in the priority replay formula.
   - Default: `DEFAULT_BETA_EXPERIENCE_REPLAY = 0.4`
+
+### Loss and Optimizer Arguments
+
+- `--loss-type <loss_type>`
+  - The type of loss to use
+  - Default: `DEFAULT_LOSS_TYPE = "huber"`

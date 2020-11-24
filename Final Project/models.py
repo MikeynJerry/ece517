@@ -19,13 +19,13 @@ def register(key):
 
 @register("stanford")
 class StanfordDQNModel(nn.Module):
-    def __init__(self, width, height, nb_actions=4):
+    def __init__(self, width, height, in_channels=3, nb_actions=4):
         super().__init__()
 
         # Network described by Stanford project
         # Conv2d = (in channels, out channels, kernel width)
         self.conv = nn.Sequential(
-            nn.Conv2d(6, 8, 3),
+            nn.Conv2d(in_channels, 8, 3),
             nn.ReLU(),
             nn.Conv2d(8, 16, 3),
             nn.ReLU(),
@@ -33,7 +33,9 @@ class StanfordDQNModel(nn.Module):
             nn.ReLU(),
         )
 
-        flat_features = self.conv(torch.zeros(1, 6, height, width)).view(1, -1).size(1)
+        flat_features = (
+            self.conv(torch.zeros(1, in_channels, height, width)).view(1, -1).size(1)
+        )
 
         self.head = nn.Sequential(
             nn.Flatten(),
@@ -50,15 +52,17 @@ class StanfordDQNModel(nn.Module):
 
 @register("small")
 class SmallGridDQN(nn.Module):
-    def __init__(self, width, height, nb_actions=4):
+    def __init__(self, width, height, in_channels=6, nb_actions=4):
         super().__init__()
 
         # Conv2d = (in channels, out channels, kernel width)
         self.conv = nn.Sequential(
-            nn.Conv2d(6, 32, 3), nn.ReLU(), nn.Conv2d(32, 64, 2), nn.ReLU()
+            nn.Conv2d(in_channels, 32, 3), nn.ReLU(), nn.Conv2d(32, 64, 2), nn.ReLU()
         )
 
-        flat_features = self.conv(torch.zeros(1, 6, height, width)).view(1, -1).size(1)
+        flat_features = (
+            self.conv(torch.zeros(1, in_channels, height, width)).view(1, -1).size(1)
+        )
 
         self.head = nn.Sequential(
             nn.Flatten(),
