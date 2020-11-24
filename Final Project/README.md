@@ -99,3 +99,10 @@ All of the defaults can be changed in `default_config.py`
 - `--loss-type <loss_type>`
   - The type of loss to use
   - Default: `DEFAULT_LOSS_TYPE = "huber"`
+
+## Testing Arguments
+
+- `--from-experiment <log_dir>`
+  - The directory containing a `config.json` file for a ran experiment
+- `--nb-testing-episodes <nb_testing_episodes>`
+  - The number of episodes to run on each model saved from the experiment defined by `<log_dir>/config.json`
