@@ -4,10 +4,9 @@ Classes meant to handle replaying experienced games
 
 import random
 from collections import deque, namedtuple
+from scipy.stats import rankdata
 import numpy as np
-
 import torch
-
 
 replay_registry = {}
 
@@ -77,7 +76,6 @@ class PrioritizedExperienceReplay(Replay):
         )
 
     def push(self, state, action, reward, next_state, terminal):
-
         max_priority = self.priorities.max() if self.steps else 1.0
 
         step = TimeStep(state, action, reward, next_state, terminal)
@@ -124,4 +122,19 @@ class PrioritizedExperienceReplay(Replay):
         losses = losses * weights
         priorities = losses + 1e-6
         self.priorities[indices] = priorities.detach()
+        return losses
+
+
+@register("priority-rank")
+class RankPrioritizedReplay(PrioritizedExperienceReplay):
+    def __init__(self, *, alpha, beta, capacity=50_000, **kwargs):
+        super().__init__(alpha=alpha, beta=beta, capacity=50_000)
+
+    def weight_losses(self, losses, indices, weights):
+        losses = losses * weights
+        numpy_losses = losses.detach().numpy()
+        priority_rank = rankdata(numpy_losses)
+        priorities = 1 / priority_rank
+        priorities = torch.from_numpy(priorities).to(self.priorities)
+        self.priorities[indices] = priorities
         return losses
