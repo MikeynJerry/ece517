@@ -10,9 +10,9 @@
 
 - Run `python play.py` to start a game
 
-- Run `python play.py -p DQNAgent` to run a game using our agent
+- Run `python play.py -p ImageDQNAgent` to run a game using our agent
 
-- Run `python play.py -p DQNAgent -l smallGrid -n <# episodes> -x <# training episodes> -f -q` to run a lot of games
+- Run `python play.py -p ImageDQNAgent -l smallGrid -n <# episodes> -x <# training episodes> -f -q` to run a lot of games
   - `-l` chooses the layout and should be one of `{smallGrid, mediumGrid, mediumClassic}`
   - `-n` is the number of total episodes to run
   - `-x` is the number of episodes to run that are solely for training (no output is provided for these)
@@ -106,3 +106,5 @@ All of the defaults can be changed in `default_config.py`
   - The directory containing a `config.json` file for a ran experiment
 - `--nb-testing-episodes <nb_testing_episodes>`
   - The number of episodes to run on each model saved from the experiment defined by `<log_dir>/config.json`
+- `--show-board`
+  - Will show the graphical display of Pacman during the testing games

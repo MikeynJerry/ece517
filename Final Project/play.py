@@ -658,6 +658,7 @@ def readCommand():
     )
     parser.add_argument("--from-experiment")
     parser.add_argument("--nb-testing-episodes", default=100, type=int)
+    parser.add_argument("--show-board", action="store_true")
 
     options, _ = parser.parse_known_args()
     args = dict()
@@ -683,9 +684,12 @@ def readCommand():
         config["model_paths"] = glob.glob(
             f"saved_models/{config['model_dir']}/policy*.th"
         )
-        config["numTraining"] = options.nb_testing_episodes * len(config["model_paths"])
+        config["numTraining"] = options.nb_testing_episodes * len(config["model_paths"]) if not options.show_board else 0
         config["numGames"] = options.nb_testing_episodes * len(config["model_paths"])
         config["nb_testing_episodes"] = options.nb_testing_episodes
+        if options.show_board:
+          config["quietGraphics"] = False
+          config["textGraphics"] = False
         args["numTesting"] = options.nb_testing_episodes
 
     options.__dict__.update(config)
