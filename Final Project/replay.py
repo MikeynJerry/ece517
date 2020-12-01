@@ -64,8 +64,7 @@ class BasicReplay(Replay):
         self.steps.append(step)
 
 
-@register("priority")
-class PrioritizedExperienceReplay(Replay):
+class PrioritizedReplay(Replay):
     def __init__(self, *, alpha, beta, capacity=50_000, **kwargs):
         super().__init__()
         self.alpha = alpha
@@ -93,7 +92,7 @@ class PrioritizedExperienceReplay(Replay):
         # Paper formula: https://arxiv.org/pdf/1511.05952.pdf
         # P(i) = (p_i^alpha) / (sum[p_i^alpha])
         probabilities = priorities ** self.alpha
-        probabilities /= probabilities.sum()
+        probabilities /= torch.sum(probabilities)
 
         # Choose mini-batch using calculated probabilities
         indices = np.random.choice(
@@ -118,23 +117,19 @@ class PrioritizedExperienceReplay(Replay):
 
         return states, actions, rewards, next_states, terminal, indices, weights
 
-    def weight_losses(self, losses, indices, weights):
-        losses = losses * weights
-        priorities = losses + 1e-6
-        self.priorities[indices] = priorities.detach()
-        return losses
-
+@register("priority-proportional")
+class PrioritizedProportionalReplay(PrioritizedReplay):
+  def weight_losses(self, losses, indices, weights):
+      losses = losses * weights
+      priorities = losses + 1e-6
+      self.priorities[indices] = priorities.detach()
+      return losses
 
 @register("priority-rank")
-class RankPrioritizedReplay(PrioritizedExperienceReplay):
-    def __init__(self, *, alpha, beta, capacity=50_000, **kwargs):
-        super().__init__(alpha=alpha, beta=beta, capacity=50_000)
-
+class PrioritizedRankReplay(PrioritizedReplay):
     def weight_losses(self, losses, indices, weights):
         losses = losses * weights
         numpy_losses = losses.detach().numpy()
-        priority_rank = rankdata(numpy_losses)
-        priorities = 1 / priority_rank
-        priorities = torch.from_numpy(priorities).to(self.priorities)
-        self.priorities[indices] = priorities
+        priorities = 1 / rankdata(numpy_losses)
+        self.priorities[indices] = torch.from_numpy(priorities).to(self.device)
         return losses
