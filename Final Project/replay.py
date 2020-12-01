@@ -117,13 +117,15 @@ class PrioritizedReplay(Replay):
 
         return states, actions, rewards, next_states, terminal, indices, weights
 
+
 @register("priority-proportional")
 class PrioritizedProportionalReplay(PrioritizedReplay):
-  def weight_losses(self, losses, indices, weights):
-      losses = losses * weights
-      priorities = losses + 1e-6
-      self.priorities[indices] = priorities.detach()
-      return losses
+    def weight_losses(self, losses, indices, weights):
+        losses = losses * weights
+        priorities = losses + 1e-6
+        self.priorities[indices] = priorities.detach()
+        return losses
+
 
 @register("priority-rank")
 class PrioritizedRankReplay(PrioritizedReplay):
