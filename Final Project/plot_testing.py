@@ -27,7 +27,6 @@ def plot(experiments, datakeys, as_subplots):
                     sum(stats[j][key][datakey]) / len(stats[j][key][datakey])
                     for key in keys[j]
                 ]
-                print(x, y)
                 axes[i].plot(x, y, label=experiments[j])
 
             axes[i].legend()
