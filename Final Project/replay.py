@@ -131,7 +131,8 @@ class PrioritizedProportionalReplay(PrioritizedReplay):
 class PrioritizedRankReplay(PrioritizedReplay):
     def weight_losses(self, losses, indices, weights):
         losses = losses * weights
-        numpy_losses = losses.detach().numpy()
+        numpy_losses = losses.detach().cpu().numpy()
         priorities = 1 / rankdata(numpy_losses)
+        priorities = priorities.astype("float32")
         self.priorities[indices] = torch.from_numpy(priorities).to(self.device)
         return losses
